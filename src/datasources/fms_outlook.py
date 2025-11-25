@@ -112,18 +112,27 @@ def build_dataframe_from_lines(lines):
     return df
 
 
-def main():
-    pdf_url = get_tc_outlook_pdf_url()
-    print(f"Found PDF URL: {pdf_url}")
+def df_to_simple_html(df):
+    """
+    Convert a DataFrame with columns ['date', 'line']
+    into simple, clean HTML.
 
-    pdf_bytes = download_pdf_bytes(pdf_url)
+    Produces something like:
 
-    df = extract_date_and_next_line(pdf_bytes)
+      <div class="tc-outlook">
+        <p><strong>Tuesday 25th November</strong><br>
+           The potential for formation...</p>
+        ...
+      </div>
+    """
+    rows = []
 
-    print(df)
-    # or return df if you want to use it elsewhere
-    return df
+    for _, row in df.iterrows():
+        date_html = f"<strong>{row['date']}</strong>"
+        line_html = row["line"]
 
+        block = "<p>" f"{date_html}<br>" f"{line_html}" "</p>"
+        rows.append(block)
 
-if __name__ == "__main__":
-    main()
+    html = '<div class="tc-outlook">\n' + "\n".join(rows) + "\n</div>"
+    return html
