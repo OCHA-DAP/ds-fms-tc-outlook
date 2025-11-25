@@ -1,0 +1,36 @@
+name: Send FMS Outlook update email
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * *' # Runs daily at 05:00 UTC
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        ref: setup-email
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: '3.11.4'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e .
+        python -m pip install -r requirements.txt
+
+    - name: Run script
+      env:
+        DSCI_LISTMONK_API_USERNAME: ${{ vars.DSCI_LISTMONK_API_USERNAME }}
+        DSCI_LISTMONK_API_KEY: ${{ secrets.DSCI_LISTMONK_API_KEY }}
+
+      run: |
+        python pipelines/update_fms_outlook.py
