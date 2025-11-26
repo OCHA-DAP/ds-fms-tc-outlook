@@ -8,6 +8,8 @@ from src.datasources.fms_outlook import (
 )
 from src.email.listmonk import create_campaign, send_campaign
 
+LIST_ID = 9
+
 HTML_INTRO = """
 Dear colleagues,
 <br><br>
@@ -58,7 +60,7 @@ def main():
     campaign_id = create_campaign(
         name=subject,
         subject=subject,
-        list_ids=[5],
+        list_ids=[LIST_ID],
         body=html_body,
     )
     print(f"Created campaign with ID: {campaign_id}")
