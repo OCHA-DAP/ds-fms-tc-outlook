@@ -2,7 +2,7 @@ import os
 
 import requests
 
-BASE_URL = "https://listmonk-dev-a5a7e5hbdxh5gxem.eastus2-01.azurewebsites.net/api"  # noqa
+BASE_URL = "https://listmonk-demo-afhcg8e2hde0fxca.eastus2-01.azurewebsites.net/api"  # noqa
 
 TRISTAN_ONLY_LIST_ID = 5
 TRISTAN_SUBSCRIBER_ID = "tristan.downing@un.org"
