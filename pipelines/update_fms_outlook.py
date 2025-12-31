@@ -22,7 +22,7 @@ and the most up-to-date outlook can always be found on the FMS website
 <br><br>
 The risk of cyclone formation over the next five days is indicated below.
 Note that if the point refers to a "shaded region" or something else on a map,
-please refer to this specific outlook, available online
+please refer to the actual PDF of this specific outlook, available online
 <a href="{pdf_url}">here</a>.
 <br><br>
 """
