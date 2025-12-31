@@ -3,12 +3,13 @@ import datetime
 from src.datasources.fms_outlook import (
     df_to_simple_html,
     download_pdf_bytes,
-    extract_date_and_next_line,
+    extract_date_sections_from_pdf,
     get_tc_outlook_pdf_url,
 )
 from src.email.listmonk import create_campaign, send_campaign
 
 LIST_ID = 9
+TRISTAN_ONLY_LIST_ID = 5
 
 HTML_INTRO = """
 Dear colleagues,
@@ -19,7 +20,10 @@ This specific outlook is available online <a href="{pdf_url}">here</a>,
 and the most up-to-date outlook can always be found on the FMS website
 <a href="https://www.met.gov.fj/fiji-weather/5-day-tc-outlook/">here</a>.
 <br><br>
-The risk of cyclone formation over the next five days is shown below:
+The risk of cyclone formation over the next five days is indicated below.
+Note that if the point refers to a "shaded region" or something else on a map,
+please refer to this specific outlook, available online
+<a href="{pdf_url}">here</a>.
 <br><br>
 """
 
@@ -37,16 +41,17 @@ def main():
 
     pdf_bytes = download_pdf_bytes(pdf_url)
 
-    df = extract_date_and_next_line(pdf_bytes)
-
+    df = extract_date_sections_from_pdf(pdf_bytes)
     print(df)
-    # or return df if you want to use it elsewhere
+
     html_df = df_to_simple_html(df)
+
     html_df_indented = (
-        '<div style="padding-left:20px;font-style:italic">\n'
+        '<div style="padding-left:20px;font-style:italic;">\n'
         + html_df
         + "\n</div>"
     )
+
     html_intro = HTML_INTRO.format(
         current_date=current_date,
         pdf_url=pdf_url,
@@ -54,15 +59,15 @@ def main():
 
     html_body = html_intro + html_df_indented + HTML_CONCLUSION
 
-    print(f"HTML content: {html_df}")
-
     subject = "FMS TC Outlook issued " + current_date
+
     campaign_id = create_campaign(
         name=subject,
         subject=subject,
         list_ids=[LIST_ID],
         body=html_body,
     )
+
     print(f"Created campaign with ID: {campaign_id}")
     send_campaign(campaign_id=campaign_id)
     print("Campaign sent.")

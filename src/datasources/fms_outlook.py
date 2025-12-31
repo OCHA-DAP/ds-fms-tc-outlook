@@ -8,7 +8,6 @@ import requests
 from bs4 import BeautifulSoup
 
 BASE_URL = "https://www.met.gov.fj/fiji-weather/5-day-tc-outlook/"
-PREFIX = "The potential for formation of a Tropical Cyclone in the region is"
 WEEKDAY_RE = re.compile(
     r"^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b",
     re.IGNORECASE,
@@ -56,17 +55,31 @@ def download_pdf_bytes(pdf_url: str) -> bytes:
     return resp.content
 
 
-def extract_date_and_next_line(pdf_bytes: bytes) -> pd.DataFrame:
-    """
-    From the TC outlook PDF, extract pairs of:
-      - date_line (e.g. 'Tuesday 25th November')
-      - following_line (e.g. 'The potential for formation ... VERY LOW.')
+def df_to_simple_html(df):
+    parts = []
 
-    Returns a DataFrame with columns:
-      - 'date'
-      - 'line'
+    for _, row in df.iterrows():
+        block = (
+            "<p>" f"<strong>{row['date']}</strong><br>" f"{row['text']}" "</p>"
+        )
+        parts.append(block)
+
+    return "<div class='tc-outlook'>\n" + "\n".join(parts) + "\n</div>"
+
+
+def extract_date_sections_from_pdf(pdf_bytes: bytes) -> pd.DataFrame:
+    """
+    Extract sections from the PDF where each section starts with a date line.
+    All text after the date line (until the next date) is grouped together.
+
+    Returns a DataFrame with:
+      - date
+      - text   (joined block for that date)
     """
     records = []
+
+    current_date = None
+    current_lines = []
 
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         for page in pdf.pages:
@@ -74,65 +87,37 @@ def extract_date_and_next_line(pdf_bytes: bytes) -> pd.DataFrame:
             if not text:
                 continue
 
-            lines = [ln.strip() for ln in text.splitlines()]
+            for raw_line in text.splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
 
-            i = 0
-            while i < len(lines):
-                line = lines[i].strip()
                 if is_date_line(line):
-                    # Find the next non-empty line
-                    j = i + 1
-                    while j < len(lines) and not lines[j].strip():
-                        j += 1
+                    # Save previous block
+                    if current_date is not None:
+                        records.append(
+                            {
+                                "date": current_date,
+                                "text": " ".join(current_lines),
+                            }
+                        )
 
-                    if j < len(lines):
-                        next_line = lines[j].strip()
-                    else:
-                        next_line = ""
+                    # Start new block
+                    current_date = line
+                    current_lines = []
 
-                    records.append(
-                        {
-                            "date": line,
-                            "line": next_line,
-                        }
-                    )
-
-                    # Move on from the next line
-                    i = j + 1
                 else:
-                    i += 1
+                    # Only collect lines if we've seen a date already
+                    if current_date is not None:
+                        current_lines.append(line)
 
-    df = pd.DataFrame(records)
-    return df
+        # Save final block
+        if current_date is not None:
+            records.append(
+                {
+                    "date": current_date,
+                    "text": " ".join(current_lines),
+                }
+            )
 
-
-def build_dataframe_from_lines(lines):
-    """Create a pandas DataFrame from the extracted lines."""
-    df = pd.DataFrame({"potential_line": lines})
-    return df
-
-
-def df_to_simple_html(df):
-    """
-    Convert a DataFrame with columns ['date', 'line']
-    into simple, clean HTML.
-
-    Produces something like:
-
-      <div class="tc-outlook">
-        <p><strong>Tuesday 25th November</strong><br>
-           The potential for formation...</p>
-        ...
-      </div>
-    """
-    rows = []
-
-    for _, row in df.iterrows():
-        date_html = f"<strong>{row['date']}</strong>"
-        line_html = row["line"]
-
-        block = "<p>" f"{date_html}<br>" f"{line_html}" "</p>"
-        rows.append(block)
-
-    html = '<div class="tc-outlook">\n' + "\n".join(rows) + "\n</div>"
-    return html
+    return pd.DataFrame(records)
