@@ -7,7 +7,17 @@ dependencies = [
     "pandas",
     "pdfplumber",
     "Requests",
+    "ocha-relay",
 ]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.uv.sources]
+ocha-relay = { git = "https://github.com/OCHA-DAP/ocha-relay.git", rev = "v0.3.0" }
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.black]
 line-length = 79
