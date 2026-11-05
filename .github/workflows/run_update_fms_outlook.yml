@@ -8,6 +8,7 @@ name: Send FMS Outlook update email
 # default to true here and in the code. Scheduled runs take the repo
 # variables: TEST_EMAIL=true sends to the test list (5) only,
 # TEST_EMAIL=false to the real list (9); DRY_RUN must be false to send.
+# A manual run defaults to a real send to the test list.
 
 on:
   workflow_dispatch:
@@ -28,6 +29,11 @@ on:
 permissions:
   contents: read
 
+# one run at a time, so two runs can't both pass the send-once check
+concurrency:
+  group: fms-outlook
+  cancel-in-progress: false
+
 jobs:
   run-script:
     runs-on: ubuntu-latest
@@ -36,11 +42,6 @@ jobs:
       # ubuntu-latest is Ubuntu 26.04 from late 2026; without a pin uv picks
       # the newest Python
       UV_PYTHON: "3.11"
-      # ocha-relay reads DSCI_LISTMONK_BASE_URL; the org secret is
-      # DSCI_LISTMONK_API_URL
-      DSCI_LISTMONK_BASE_URL: ${{ secrets.DSCI_LISTMONK_API_URL }}
-      DSCI_LISTMONK_API_USERNAME: ${{ secrets.DSCI_LISTMONK_API_USERNAME }}
-      DSCI_LISTMONK_API_KEY: ${{ secrets.DSCI_LISTMONK_API_KEY }}
       TEST_EMAIL: ${{ inputs.test_email || vars.TEST_EMAIL || 'true' }}
       DRY_RUN: ${{ inputs.dry_run || vars.DRY_RUN || 'true' }}
     steps:
@@ -57,4 +58,10 @@ jobs:
         run: uv run pytest -q
 
       - name: Send outlook email
+        env:
+          # ocha-relay reads DSCI_LISTMONK_BASE_URL; the org secret is
+          # DSCI_LISTMONK_API_URL
+          DSCI_LISTMONK_BASE_URL: ${{ secrets.DSCI_LISTMONK_API_URL }}
+          DSCI_LISTMONK_API_USERNAME: ${{ secrets.DSCI_LISTMONK_API_USERNAME }}
+          DSCI_LISTMONK_API_KEY: ${{ secrets.DSCI_LISTMONK_API_KEY }}
         run: uv run python -m pipelines.update_fms_outlook

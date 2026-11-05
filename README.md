@@ -25,7 +25,8 @@ value when they are unset (KB `infrastructure/email-testing.md`).
 | `TEST_EMAIL` | test list (id 5); campaign tagged `[TEST]` | real list (id 9, "FMS TC outlook") |
 | `DRY_RUN` | print the email, no Listmonk calls | send |
 
-A manual run (Actions → Run workflow) takes the same two values as inputs.
+A manual run (Actions → Run workflow) takes the same two values as inputs;
+its defaults send to the test list.
 The Listmonk credentials are the OCHA-DAP organisation secrets
 `DSCI_LISTMONK_API_URL`, `DSCI_LISTMONK_API_USERNAME` and
 `DSCI_LISTMONK_API_KEY`.
@@ -33,6 +34,9 @@ The Listmonk credentials are the OCHA-DAP organisation secrets
 Each outlook is sent once: the campaign name carries the outlook's issue
 date, and a run that finds a sent campaign with the same name skips. So a
 re-run, or a run before FMS has posted the day's outlook, sends nothing.
+An outlook issued more than a day before the run is not sent at all (for
+example the season's last outlook, still on the site in May). If the PDF has
+no readable "Issue Time" line, the run fails and sends nothing.
 
 ## Local run
 

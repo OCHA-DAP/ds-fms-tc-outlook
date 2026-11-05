@@ -103,3 +103,32 @@ def test_season_end_outlook_has_no_days():
     assert text.startswith("Existing Tropical Cyclones: Nil The potential")
     assert text.endswith("for this season.")
     assert undated_text(["no header"]) == ""
+
+
+def test_issue_time_variants():
+    want = dt.datetime(2026, 11, 5, 4, 0, tzinfo=dt.timezone.utc)
+    for line in [
+        "Issue Time: 0400 UTC 5th November 2026.",  # no weekday
+        "Issue Time: 0400 UTC Thursday 5th Nov 2026.",  # short month
+        "Issue Time: 400 UTC Thursday 5th November 2026.",
+        "Issue Time: 04:00 UTC, Thursday 5 November, 2026",
+    ]:
+        assert parse_issue_time([line]) == want, line
+
+
+def test_issue_time_keeps_looking_after_a_bad_line():
+    lines = [
+        "Issue Time: 0400 UTC Thursday 31st Smarch 2026.",
+        "Issue Time: 0400 UTC Thursday 5th November 2026.",
+    ]
+    assert parse_issue_time(lines).day == 5
+
+
+def test_sentence_ending_in_a_date_is_not_a_day():
+    lines = [
+        "Friday 6th November",
+        "The system is expected to weaken by",
+        "Monday 9th November.",
+    ]
+    df = extract_date_sections(lines)
+    assert df["date"].tolist() == ["Friday 6th November"]

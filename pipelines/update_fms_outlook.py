@@ -9,7 +9,9 @@ Run modes (KB infrastructure/email-testing.md), both default to true:
 
 Send-once: the campaign name carries the outlook's issue date, so a run that
 finds an outlook already sent (e.g. FMS has not posted today's yet, or the
-workflow is re-run) skips instead of sending a duplicate.
+workflow is re-run) skips instead of sending a duplicate. An outlook issued
+more than a day ago is not sent, and a PDF without a readable issue time
+fails the run rather than sending.
 
 Run from the repo root: uv run python -m pipelines.update_fms_outlook
 """
@@ -35,6 +37,7 @@ from src.flags import mode
 LIST_ID = 9  # "FMS TC outlook" (private, untagged)
 TEST_LIST_ID = 5  # "Tristan only"
 SEARCH_TOKEN = "Outlook"  # campaign search is a tsquery: one plain word
+MAX_AGE_DAYS = 1  # send an outlook issued today or yesterday, nothing older
 
 HTML_INTRO = """
 Dear colleagues,
@@ -60,10 +63,7 @@ OCHA Centre for Humanitarian Data
 
 
 def build_email(df, pdf_url, issue_time):
-    if issue_time is not None:
-        issued = f"{issue_time:%H%M} UTC {issue_time.day} {issue_time:%B %Y}"
-    else:
-        issued = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d")
+    issued = f"{issue_time:%H%M} UTC {issue_time.day} {issue_time:%B %Y}"
     html_df_indented = (
         '<div style="padding-left:20px;font-style:italic;">\n'
         + df_to_simple_html(df)
@@ -85,6 +85,7 @@ def existing_campaigns(client, name):
             "per_page": 50,
             "order_by": "created_at",
             "order": "desc",
+            "no_body": "true",
         },
         timeout=client.timeout,
     )
@@ -100,16 +101,24 @@ def main():
     print(f"Found PDF URL: {pdf_url}")
     lines = pdf_lines(download_pdf_bytes(pdf_url))
 
+    # The issue date keys send-once, so without it nothing is sent: a
+    # reworded line must not turn into the same outlook sent every day.
     issue_time = parse_issue_time(lines)
     if issue_time is None:
-        print("WARNING: no 'Issue Time' line in the PDF; using today's date")
-        issue_date = dt.datetime.now(dt.timezone.utc).date()
-    else:
-        print(f"Outlook issued {issue_time:%Y-%m-%d %H:%M} UTC")
-        issue_date = issue_time.date()
-        age = dt.datetime.now(dt.timezone.utc).date() - issue_date
-        if age > dt.timedelta(days=1):
-            print(f"WARNING: the latest outlook is {age.days} days old")
+        print("First lines of the PDF:", lines[:8])
+        raise RuntimeError(
+            "No readable 'Issue Time' line in the outlook PDF; the format may"
+            " have changed. Not sending."
+        )
+    print(f"Outlook issued {issue_time:%Y-%m-%d %H:%M} UTC")
+    issue_date = issue_time.date()
+    # Yesterday's outlook can still go out (FMS late, yesterday's run
+    # failed) and send-once stops a repeat; anything older is stale, e.g.
+    # the season's last outlook still on the site in May or October.
+    age = dt.datetime.now(dt.timezone.utc).date() - issue_date
+    if age > dt.timedelta(days=MAX_AGE_DAYS):
+        print(f"The latest outlook is {age.days} days old; nothing to send")
+        return
 
     df = extract_date_sections(lines)
     if df.empty:

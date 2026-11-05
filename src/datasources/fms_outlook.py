@@ -14,14 +14,16 @@ BASE_URL = "https://www.met.gov.fj/fiji-weather/5-day-tc-outlook/"
 # "...till Wednesday\n3rd December, 2025:" header must not match.
 DATE_LINE_RE = re.compile(
     r"(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+"
-    r"\d{1,2}(st|nd|rd|th)?\s+[A-Za-z]+\.?",
+    r"\d{1,2}(st|nd|rd|th)?\s+[A-Za-z]+",
     re.IGNORECASE,
 )
 # e.g. "Issue Time: 0400 UTC Thursday 5th November 2026." (the colon after
-# "Time" was missing in March 2026)
+# "Time" was missing in March 2026). Lenient on the time, the weekday and
+# the month's spelling, since send-once depends on this date.
 ISSUE_TIME_RE = re.compile(
-    r"Issue\s+Time\s*:?\s*(\d{2}):?(\d{2})\s*UTC\s+[A-Za-z]+,?\s+"
-    r"(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+),?\s+(\d{4})",
+    r"Issue\s+Time\s*:?\s*(\d{1,2}):?(\d{2})\s*UTC,?\s+"
+    r"(?:[A-Za-z]+,?\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?"
+    r"([A-Za-z]+)\.?,?\s+(\d{4})",
     re.IGNORECASE,
 )
 
@@ -84,12 +86,14 @@ def parse_issue_time(lines: list[str]) -> dt.datetime | None:
         if not m:
             continue
         hh, mm, day, month, year = m.groups()
-        try:
-            return dt.datetime.strptime(
-                f"{year} {month} {day} {hh}{mm}", "%Y %B %d %H%M"
-            ).replace(tzinfo=dt.timezone.utc)
-        except ValueError:
-            return None
+        for month_fmt in ("%B", "%b"):
+            try:
+                return dt.datetime.strptime(
+                    f"{year} {month} {day} {int(hh):02d}{mm}",
+                    f"%Y {month_fmt} %d %H%M",
+                ).replace(tzinfo=dt.timezone.utc)
+            except ValueError:
+                pass
     return None
 
 
